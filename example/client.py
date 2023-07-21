@@ -138,7 +138,7 @@ class simpleSocket:
         thread.start()
         return thread
 
-client = simpleSocket(ip="82.1.137.157", port=1, auto_convert=True)
+client = simpleSocket(port=1, auto_convert=True)
 
 def loadNotification():
     # notification
