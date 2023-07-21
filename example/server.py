@@ -1,18 +1,14 @@
 import socket
-import ctypes
 import time
-import tkinter as tk
-from tkinter import messagebox
 import threading
 import json
-from itertools import repeat
-
+import urllib.request
 
 hostname = socket.gethostname()
 server_ip = socket.gethostbyname(hostname)
 
 class simpleSocket:
-    def __init__(self, *args, ip=server_ip, port=1000, auto_convert=False, debug=True):
+    def __init__(self, *args, ip=server_ip, port=1, auto_convert=False, debug=True):
         self.clients = {}
         self.threads = []
 
@@ -33,7 +29,7 @@ class simpleSocket:
 
         self.server_socket.listen(1)
 
-        self.print(f"Server listening on {self.ip}:{self.port}")
+        self.print(f"Server listening on {self.ip}:{self.port}, connect with public ipv4 {self.getPublicIP()}")
 
         # Start listening for client connections
         self.makeThread(target=self._listenForClients, daemon=True).join()
@@ -129,13 +125,21 @@ class simpleSocket:
         self.threads.append(thread)
         thread.start()
         return thread
+    def getPublicIP(self):
+        external_ip = urllib.request.urlopen('https://ident.me').read().decode('utf8')
+      
+        return external_ip
 
 
 server = simpleSocket(port=1, auto_convert=True)
 
 server.messageHistory = {}
+server.channels = ["General", "Discussion"]
 server.lastSent = {}
 server.client_names = {}
+
+for channel in server.channels:
+    server.messageHistory[channel] = []
 
 def newSocket(client_socket):
     username = client_socket.recv(1024 * 20).decode()
@@ -182,6 +186,7 @@ def onMessage(client_socket, data):
         server.lastSent[client_socket] = time.time()
         print(f"{server.client_names[client_socket]}: {data['message']}")
         server.allClients(data, convert=True)
+        server.messageHistory[data.get("channel", "General")].append(data)
     elif data.get("Invisible") or data.get("Online"):
         isInvisible = data.get("Invisible", False)
 
@@ -207,6 +212,17 @@ def onMessage(client_socket, data):
                 "joinEvent": True
             }
             server.allClients(data, convert=True)
+    elif data.get("getMessageHistory"):
+        historyData = {data.get("channel", "General"): server.messageHistory[data.get("channel", "General")]}
+        historyData["Members"] = []
+        for member in server.client_names.values():
+            historyData["Members"].append(member)
+
+        historyData["IsMessageHistory"] = True
+
+        server.toClient(client_socket, historyData, convert=True)
+
+        print("Resent history to", server.client_names[client_socket])
 def onDisconnect(client_socket):
     print(f"{server.clients[client_socket]} | {server.client_names[client_socket]} disconnected!")
     data = {

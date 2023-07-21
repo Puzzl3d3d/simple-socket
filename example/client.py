@@ -1,3 +1,6 @@
+server_ip = "localhost" # This is my public ip used to connect to my pc
+server_port = 1 # The port (think of this as one cable (out of about 65000) connected to a server (the ip) to distinguish between different connections to the same server (ip) )
+
 import socket
 
 _program = socket.socket()
@@ -13,6 +16,8 @@ import winsound
 
 hostname = socket.gethostname()
 client_ip = socket.gethostbyname(hostname)
+
+messageHistoryCache = {}
 
 def getUsername():
     global username
@@ -87,7 +92,10 @@ class simpleSocket:
                     if self.auto_convert:
                         data = self.fromJSON(data)
 
-                    self._onDataRecieve(data)
+                    try:
+                        self._onDataRecieve(data)
+                    except Exception as error:
+                        print("Could not handle data recieved:",data,"|",error)
             except (ConnectionResetError, ConnectionAbortedError):
                 self.print("Disconnected from server, retry connection")
                 return
@@ -138,7 +146,7 @@ class simpleSocket:
         thread.start()
         return thread
 
-client = simpleSocket(port=1, auto_convert=True)
+client = simpleSocket(ip=server_ip, port=server_port, auto_convert=True)
 
 def loadNotification():
     # notification
@@ -153,7 +161,7 @@ def notif():
     thread.start()
 
 # Tkinter crap
-channel_names = ["General"]
+channel_names = ["General", "Discussion"]
 selected_channel = channel_names[0]
 status = "Online"
 member_labels = {}
@@ -168,7 +176,9 @@ colors = {
         "another_bg": "#36393f",
         "wtf": "#3f4147",
         "secondary_text": "#fdfdfd",
-        "input_text": "#000"
+        "input_text": "#000",
+        "selected_channel": "#40444b",
+        "unselected_channel": "#36393f"
     },
     "light": { # ew
         "bg": "#fff",
@@ -180,7 +190,9 @@ colors = {
         "another_bg": "#e3e3e3",
         "wtf": "#c5c5c7",
         "secondary_text": "#262626",
-        "input_text": "#000"
+        "input_text": "#000",
+        "selected_channel": "#ffffff",
+        "unselected_channel": "#c9c9c9"
     }
 }
 # theme / mode
@@ -197,9 +209,25 @@ def toggleRetinas():
     mode = "light" if mode == "dark" else "dark"
     with open("mode.md", "w") as file:
         file.write(mode)
-    os.startfile(__file__)
-    client_socket.close()
-    quit()
+    #os.startfile(__file__)
+    #client_socket.close()
+    #quit()
+
+    root.destroy()
+
+    render()
+
+    # load the mensajes
+
+    channelHistory = messageHistoryCache.get(selected_channel or "General", [])
+
+    print(channelHistory)
+
+    for channelMessage in channelHistory:
+        createNewMessage(channelMessage)
+
+    root.mainloop()
+
 def render():
     global root
     global chat_feed
@@ -233,16 +261,38 @@ def render():
 
 
     def select_channel(selection):
-        #global selected_channel
-        #selected_channel = selection
-        #for channel in channel_buttons:
-        #    if channel["text"] == selection:
-        #        channel.configure(bg="#40444b", activebackground="#40444b", fg=colors[mode]["text"], activeforeground=colors[mode]["text"])
-        #    else:
-        #        channel.configure(bg="#36393f", activebackground="#40444b", fg="#b9bbbe", activeforeground=colors[mode]["text"])
-        pass
+        global selected_channel
+
+        if selected_channel == selection: return
+
+        selected_channel = selection
+
+        print(selected_channel)
+
+        for channel in channel_buttons:
+            if channel["text"] == selection:
+                channel.configure(bg=colors[mode]["secondary_bg"], activebackground=colors[mode]["secondary_bg"], fg=colors[mode]["text"], activeforeground=colors[mode]["text"])
+            else:
+                channel.configure(bg=colors[mode]["unselected_channel"], activebackground=colors[mode]["secondary_bg"], fg=colors[mode]["trenary_bg"], activeforeground=colors[mode]["text"])
+        
+        for label in chat_feed.labels:
+            label.destroy()
+        chat_feed.labels = []
+
+        # load the mensajes
+
+        channelHistory = messageHistoryCache.get(selected_channel or "General", [])
+
+        print(channelHistory)
+
+        for channelMessage in channelHistory:
+            createNewMessage(channelMessage)
+
     def choose_status(*args):
         global status
+
+        if status and status == status_text.get(): return
+
         status = status_text.get()
 
         data = {
@@ -267,6 +317,8 @@ def render():
 
     status_menu.pack(side=tk.LEFT, padx=(10, 0), pady=5)
 
+    choose_status("Online")
+
     #search_entry = tk.Entry(header, bg=colors[mode]["secondary_bg"], fg=colors[mode]["text"], bd=0, highlightthickness=0)
     #search_entry.insert(0, "Search")
     #search_entry.pack(side=tk.LEFT, padx=(10, 0), pady=5)
@@ -280,13 +332,11 @@ def render():
     channel_buttons = []
 
     for name in channel_names:
-        channel = tk.Button(channel_frame, text=name, bg=colors[mode]["another_bg"], fg=colors[mode]["trenary_bg"], bd=0, activebackground=colors[mode]["secondary_bg"], activeforeground=colors[mode]["text"], highlightthickness=0, relief=tk.FLAT, command=select_channel)
+        channel = tk.Button(channel_frame, text=name, bg=colors[mode]["unselected_channel"], fg=colors[mode]["trenary_bg"], bd=0, activebackground=colors[mode]["secondary_bg"], activeforeground=colors[mode]["text"], highlightthickness=0, relief=tk.FLAT, command=lambda name=name: select_channel(name))
         channel.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
         if name == selected_channel:
-            channel.configure(bg=colors[mode]["secondary_bg"], activebackground=colors[mode]["secondary_bg"], fg=colors[mode]["text"], activeforeground=colors[mode]["text"])
+            channel.configure(bg=colors[mode]["selected_channel"], activebackground=colors[mode]["secondary_bg"], fg=colors[mode]["text"], activeforeground=colors[mode]["text"])
         channel_buttons.append(channel)
-
-    select_channel(channel_names[0])
 
     message_input = tk.Entry(root, bg=colors[mode]["trenary_bg"], fg=colors[mode]["input_text"], bd=0, highlightthickness=0)
     message_input.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
@@ -296,6 +346,8 @@ def render():
 
     members_list = List(root, text="Members", bg=colors[mode]["another_bg"], fg=colors[mode]["text"], bd=0, highlightthickness=0, relief=tk.FLAT, width=130)
     members_list.pack(side=tk.RIGHT, fill=tk.Y, padx=(0,5), expand=False)
+
+    select_channel(channel_names[0])
 
     # so you can actually type ffs
     root.bind("<Return>", getMessageText)
@@ -317,7 +369,7 @@ def createNewMessage(data):
     sender = data["sender"]
     message = data["message"]
     channel = data["channel"]
-    isSystem = data.get("systemMessage")
+    isSystem = data.get("systemMessage", False)
     
     chat_feed.add_message(f"{sender}: {message}", isSystem)
 
@@ -345,20 +397,27 @@ def onConnect():
     root.mainloop()
 
     # Close the connection after tkinter dies
-    client_socket.close()
+    #client_socket.close()
 def onMessage(data):
     if data.get("IsMessageHistory"):
-        for channel, messages in data.items():
-            if channel in channel_names:
-                for _data in messages:
-                    createNewMessage(_data)
-            elif channel != "IsMessageHistory":
-                # members list
-                for member in messages:
-                    if member_labels.get(member) != None: continue
-                    member_labels[member] = members_list.add_message(member, False)
+        global messageHistoryCache
+        messageHistoryCache = data
+        print(data)
+        channelHistory = data.get(selected_channel or "General", [])
+        membersList = data.get("Members", [])
+
+        print(channelHistory)
+
+        for channelMessage in channelHistory:
+            createNewMessage(channelMessage)
+
+        for member in membersList:
+            if member_labels.get(member) != None: continue
+            member_labels[member] = members_list.add_message(member, False)
     else:
-        createNewMessage(data)
+        if data.get("channel", "General") == selected_channel:
+            createNewMessage(data)
+        messageHistoryCache[data.get("channel", "General")].append(data)
         if data["sender"] != username: notif()
 
 client.bindConnect(onConnect)
