@@ -1,10 +1,10 @@
-import socket, os, json, threading
+import socket, os, json, threading, urllib.request
 
 hostname = socket.gethostname()
 server_ip = socket.gethostbyname(hostname)
 
 class simpleSocket:
-    def __init__(self, *args, ip=server_ip, port=1000, auto_convert=False, debug=True):
+    def __init__(self, *args, ip=server_ip, port=1, auto_convert=False, debug=True):
         self.clients = {}
         self.threads = []
 
@@ -25,7 +25,7 @@ class simpleSocket:
 
         self.server_socket.listen(1)
 
-        self.print(f"Server listening on {self.ip}:{self.port}")
+        self.print(f"Server listening on {self.ip}:{self.port}, connect with public ipv4 {self.getPublicIP()}")
 
         # Start listening for client connections
         self.makeThread(target=self._listenForClients, daemon=True).join()
@@ -121,7 +121,10 @@ class simpleSocket:
         self.threads.append(thread)
         thread.start()
         return thread
-
+    def getPublicIP(self):
+        external_ip = urllib.request.urlopen('https://ident.me').read().decode('utf8')
+      
+        return external_ip
 
 if __name__ == "__main__":
     server = simpleSocket()
