@@ -58,7 +58,10 @@ class simpleSocket:
                     if self.auto_convert:
                         data = self.fromJSON(data)
 
-                    self._onDataRecieve(data)
+                    try:
+                        self._onDataRecieve(data)
+                    except Exception as error:
+                        print("Could not handle data recieved:",data,"|",error)
             except (ConnectionResetError, ConnectionAbortedError):
                 self.print("Disconnected from server, retry connection")
                 return
