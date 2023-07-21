@@ -1,4 +1,12 @@
-import socket, os, json, threading
+import socket
+import ctypes
+import time
+import tkinter as tk
+from tkinter import messagebox
+import threading
+import json
+from itertools import repeat
+
 
 hostname = socket.gethostname()
 server_ip = socket.gethostbyname(hostname)
@@ -123,7 +131,97 @@ class simpleSocket:
         return thread
 
 
-if __name__ == "__main__":
-    server = simpleSocket()
+server = simpleSocket(port=1, auto_convert=True)
 
-    server.init()
+server.messageHistory = {}
+server.lastSent = {}
+server.client_names = {}
+
+def newSocket(client_socket):
+    username = client_socket.recv(1024 * 20).decode()
+
+    if not (username and username != "" and 0 < len(username) <= 20):
+        username = f"IP: {server.clients[client_socket]}"
+
+    server.client_names[client_socket] = username
+
+    print("New client!", username)
+    
+    print("Connected clients:")
+    for username in server.client_names.values():
+        print("\t",username)
+
+    historyData = server.messageHistory
+    historyData["Members"] = []
+    for member in server.client_names.values():
+        historyData["Members"].append(member)
+
+    historyData["IsMessageHistory"] = True
+
+    server.toClient(client_socket, historyData, convert=True)
+
+    data = {
+        "sender": "SYSTEM",
+        "systemMessage": True,
+        "message": username+" joined the chat room",
+        "channel": "General",
+        "member": username,
+        "joinEvent": True
+    }
+    server.allClients(data, convert=True)
+def onMessage(client_socket, data):
+    if data.get("message"):
+        data["systemMessage"] = False
+
+        if len(data["message"]) > 200:
+            return
+        if time.time() - (server.lastSent.get(client_socket) or 0) < 0.3:
+            server.lastSent[client_socket] = time.time() + 1
+            return
+
+        server.lastSent[client_socket] = time.time()
+        print(f"{server.client_names[client_socket]}: {data['message']}")
+        server.allClients(data, convert=True)
+    elif data.get("Invisible") or data.get("Online"):
+        isInvisible = data.get("Invisible", False)
+
+        print(f"{server.client_names[client_socket]} is appearing", "Invisible" if isInvisible else "Online")
+
+        if isInvisible:
+            data = {
+                "sender": "SYSTEM",
+                "systemMessage": True,
+                "message": server.client_names[client_socket]+" left the chat room",
+                "channel": "General",
+                "member": server.client_names[client_socket],
+                "leaveEvent": True
+            }
+            server.allClients(data, convert=True)
+        else:
+            data = {
+                "sender": "SYSTEM",
+                "systemMessage": True,
+                "message": server.client_names[client_socket]+" joined the chat room",
+                "channel": "General",
+                "member": server.client_names[client_socket],
+                "joinEvent": True
+            }
+            server.allClients(data, convert=True)
+def onDisconnect(client_socket):
+    print(f"{server.clients[client_socket]} | {server.client_names[client_socket]} disconnected!")
+    data = {
+        "sender": "SYSTEM",
+        "systemMessage": True,
+        "message": server.client_names[client_socket]+" left the chat room",
+        "channel": "General",
+        "member": server.client_names[client_socket],
+        "leaveEvent": True
+    }
+    server.allClients(data, convert=True)
+    server.client_names.pop(client_socket)
+    
+server.bindNewSocket(newSocket)
+server.bindRecieve(onMessage)
+server.bindDisconnect(onDisconnect)
+
+server.init()
