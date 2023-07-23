@@ -45,6 +45,7 @@ class simpleSocket:
     def _startRecieving(self, client_socket):
         while True:
             try:
+                if not server.clients.get(client_socket): break
                 data = client_socket.recv(1024 * 20).decode()
 
                 if data:
@@ -52,7 +53,11 @@ class simpleSocket:
                     if self.auto_convert:
                         data = self.fromJSON(data)
 
-                    self._onDataRecieve(client_socket, data)
+                    if type(data) == list:
+                        for data in data:
+                            self._onDataRecieve(client_socket, data)
+                    else:
+                        self._onDataRecieve(client_socket, data)
             except ConnectionResetError:
                 self._onDisconnect(client_socket)
                 self.clients.pop(client_socket)
@@ -137,6 +142,7 @@ server.messageHistory = {}
 server.channels = ["General", "Discussion"]
 server.lastSent = {}
 server.client_names = {}
+server.attemptedBotting = {}
 
 for channel in server.channels:
     server.messageHistory[channel] = []
@@ -174,20 +180,47 @@ def newSocket(client_socket):
     }
     server.allClients(data, convert=True)
 def onMessage(client_socket, data):
+    if not server.clients.get(client_socket): return 
     if data.get("message"):
         data["systemMessage"] = False
 
         if len(data["message"]) > 200:
             return
-        if time.time() - (server.lastSent.get(client_socket) or 0) < 0.3:
+        if time.time() - server.lastSent.get(client_socket, 0) < 0.3:
             server.lastSent[client_socket] = time.time() + 1
             return
-
         server.lastSent[client_socket] = time.time()
+
         print(f"{server.client_names[client_socket]}: {data['message']}")
         server.allClients(data, convert=True)
         server.messageHistory[data.get("channel", "General")].append(data)
     elif data.get("Invisible") or data.get("Online"):
+        if time.time() - server.lastSent.get(client_socket, 0) < 0.5:
+            server.lastSent[client_socket] = time.time() + 2
+            last = server.attemptedBotting.get(client_socket, 0)
+            server.attemptedBotting[client_socket] = last + 1
+            print(last)
+            if last+1 > 20:
+                name = server.client_names.get(client_socket, "User")
+
+                if server.clients.get(client_socket): server.clients.pop(client_socket)
+                if server.client_names.get(client_socket): server.client_names.pop(client_socket)
+
+                data = {
+                    "sender": "SYSTEM",
+                    "systemMessage": True,
+                    "message": name+" was kicked from the chat room",
+                    "channel": "General",
+                    "member": name,
+                    "leaveEvent": True
+                }
+                server.allClients(data, convert=True)
+
+                client_socket.shutdown(1)
+
+            return
+        server.lastSent[client_socket] = time.time()
+
         isInvisible = data.get("Invisible", False)
 
         print(f"{server.client_names[client_socket]} is appearing", "Invisible" if isInvisible else "Online")
