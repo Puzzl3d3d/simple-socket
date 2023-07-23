@@ -99,7 +99,7 @@ class simpleSocket:
                         else:
                             self._onDataRecieve(data)
                     except Exception as error:
-                        print("Could not handle data recieved:",data,"|",error)
+                        self.print("Could not handle data recieved:",data,"|",error)
             except (ConnectionResetError, ConnectionAbortedError):
                 self.print("Disconnected from server, retry connection")
                 return
