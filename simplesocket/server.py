@@ -37,7 +37,7 @@ class simpleSocket:
         self.print(self.clients[client_socket][0],"sent data:",data)
         pass
     def _onDisconnect(self, client_socket):
-        print(self.clients.get(client_socket, "Client"),"disconnected")
+        self.print(self.clients.get(client_socket, "Client"),"disconnected")
     def _startRecieving(self, client_socket):
         while True:
             try:
@@ -91,14 +91,14 @@ class simpleSocket:
             try:
                 data.append(json.loads(json_string))
             except json.decoder.JSONDecodeError:
-                print("Could not convert JSON:",json_string)
+                self.print("Could not convert JSON:",json_string)
         
         return data if len(data) > 1 else data[0]
     def toJSON(self, data):
         try:
             return json.dumps(data)
         except:
-            print("Could not convert data:",data)
+            self.print("Could not convert data:",data)
     def toClient(self, client_socket, data, convert=False):
         if convert or not isinstance(data, str):
             data = self.toJSON(data)
