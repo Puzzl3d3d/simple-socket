@@ -59,7 +59,11 @@ class simpleSocket:
                         data = self.fromJSON(data)
 
                     try:
-                        self._onDataRecieve(data)
+                        if type(data) == list:
+                            for data in data:
+                                self._onDataRecieve(data)
+                        else:
+                            self._onDataRecieve(data)
                     except Exception as error:
                         print("Could not handle data recieved:",data,"|",error)
             except (ConnectionResetError, ConnectionAbortedError):
@@ -111,6 +115,7 @@ class simpleSocket:
         self.threads.append(thread)
         thread.start()
         return thread
+
 
 if __name__ == "__main__":
     client = simpleSocket()
