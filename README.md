@@ -40,7 +40,7 @@ The port of the program
 ### auto_convert
 When enabled, it treats all incoming data from the client/server as a JSON string, and automatically converts it using `json.loads`
 
-This setting is recommended, but enabling it isn't required
+This setting is recommended, but enabling it isn't required as you can instead use the `convert` keyword argument for a case-by-case approach
 
 ## Sending data
 
@@ -59,4 +59,4 @@ or "broadcasting" across every client
 For the client, you would use `toServer(data, convert=bool)`
 
 ### Conversion
-As stated above in the `auto_convert` specificatiion, the `convert=bool` keyword argument of the sending data functions can be used instead of treating every piece of incoming data as JSON, instead going case-by-case
+As stated above in the `auto_convert` specification, the `convert=bool` keyword argument of the sending data functions can be used instead of treating every piece of data as JSON, instead going case-by-case
