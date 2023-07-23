@@ -41,6 +41,7 @@ class simpleSocket:
     def _startRecieving(self, client_socket):
         while True:
             try:
+                if not server.clients.get(client_socket): break
                 data = client_socket.recv(1024 * 20).decode()
 
                 if data:
@@ -48,7 +49,11 @@ class simpleSocket:
                     if self.auto_convert:
                         data = self.fromJSON(data)
 
-                    self._onDataRecieve(client_socket, data)
+                    if type(data) == list:
+                        for data in data:
+                            self._onDataRecieve(client_socket, data)
+                    else:
+                        self._onDataRecieve(client_socket, data)
             except ConnectionResetError:
                 self._onDisconnect(client_socket)
                 self.clients.pop(client_socket)
@@ -125,6 +130,7 @@ class simpleSocket:
         external_ip = urllib.request.urlopen('https://ident.me').read().decode('utf8')
       
         return external_ip
+
 
 if __name__ == "__main__":
     server = simpleSocket()
